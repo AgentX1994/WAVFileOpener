@@ -8,6 +8,9 @@
 
 /* Begin PBXBuildFile section */
 		5259E4901D5BB11700E50CC9 /* main.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5259E48F1D5BB11700E50CC9 /* main.cpp */; };
+		5259E4981D5BB1F400E50CC9 /* WavFile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 5259E4961D5BB1F400E50CC9 /* WavFile.cpp */; };
+		5259E49A1D5BC44F00E50CC9 /* AudioToolbox.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5259E4991D5BC44F00E50CC9 /* AudioToolbox.framework */; };
+		5259E49C1D5BCE7400E50CC9 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 5259E49B1D5BCE7400E50CC9 /* CoreFoundation.framework */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -25,6 +28,11 @@
 /* Begin PBXFileReference section */
 		5259E48C1D5BB11700E50CC9 /* WavFileOpener */ = {isa = PBXFileReference; explicitFileType = "compiled.mach-o.executable"; includeInIndex = 0; path = WavFileOpener; sourceTree = BUILT_PRODUCTS_DIR; };
 		5259E48F1D5BB11700E50CC9 /* main.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = main.cpp; sourceTree = "<group>"; };
+		5259E4961D5BB1F400E50CC9 /* WavFile.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = WavFile.cpp; sourceTree = "<group>"; };
+		5259E4971D5BB1F400E50CC9 /* WavFile.hpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.h; path = WavFile.hpp; sourceTree = "<group>"; };
+		5259E4991D5BC44F00E50CC9 /* AudioToolbox.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = AudioToolbox.framework; path = System/Library/Frameworks/AudioToolbox.framework; sourceTree = SDKROOT; };
+		5259E49B1D5BCE7400E50CC9 /* CoreFoundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = CoreFoundation.framework; path = System/Library/Frameworks/CoreFoundation.framework; sourceTree = SDKROOT; };
+		5259E49D1D5BCF3B00E50CC9 /* test.wav */ = {isa = PBXFileReference; lastKnownFileType = audio.wav; path = test.wav; sourceTree = SOURCE_ROOT; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -32,6 +40,8 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5259E49C1D5BCE7400E50CC9 /* CoreFoundation.framework in Frameworks */,
+				5259E49A1D5BC44F00E50CC9 /* AudioToolbox.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -41,6 +51,8 @@
 		5259E4831D5BB11700E50CC9 = {
 			isa = PBXGroup;
 			children = (
+				5259E49B1D5BCE7400E50CC9 /* CoreFoundation.framework */,
+				5259E4991D5BC44F00E50CC9 /* AudioToolbox.framework */,
 				5259E48E1D5BB11700E50CC9 /* WavFileOpener */,
 				5259E48D1D5BB11700E50CC9 /* Products */,
 			);
@@ -58,6 +70,9 @@
 			isa = PBXGroup;
 			children = (
 				5259E48F1D5BB11700E50CC9 /* main.cpp */,
+				5259E4961D5BB1F400E50CC9 /* WavFile.cpp */,
+				5259E4971D5BB1F400E50CC9 /* WavFile.hpp */,
+				5259E49D1D5BCF3B00E50CC9 /* test.wav */,
 			);
 			path = WavFileOpener;
 			sourceTree = "<group>";
@@ -118,6 +133,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				5259E4981D5BB1F400E50CC9 /* WavFile.cpp in Sources */,
 				5259E4901D5BB11700E50CC9 /* main.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
