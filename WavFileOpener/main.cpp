@@ -12,6 +12,7 @@
 
 #include "WavFile.hpp"
 
+// Struct to hold data for AQcallback
 typedef struct {
     WavFile *w;
     uint32_t cur_sample;
@@ -20,6 +21,9 @@ typedef struct {
     AudioStreamBasicDescription fmt;
 } Player;
 
+// Callback for Audio Queue
+// Pulls samples from the WavFile and puts it in the AudioQueueBuffer
+// And Enqueues it to be played
 void AQcallback (void *ptr, AudioQueueRef queue, AudioQueueBufferRef buf_ref){
     Player *p = (Player *)ptr;
     OSStatus status;
@@ -47,6 +51,7 @@ void AQcallback (void *ptr, AudioQueueRef queue, AudioQueueBufferRef buf_ref){
     status = AudioQueueEnqueueBuffer (queue, buf_ref, 0, NULL);
 }
 
+// Checks the status field returned by AudioQueue functions for errors
 std::string getError(OSStatus status){
     switch (status) {
         case kAudioQueueErr_InvalidBuffer:
@@ -95,6 +100,7 @@ std::string getError(OSStatus status){
 
 }
 
+// Figures out the proper buffer size for the a specific length of audio
 void DeriveBufferSize (
                        AudioStreamBasicDescription &ASBDesc,
                        UInt32                      maxPacketSize,
@@ -128,8 +134,10 @@ void DeriveBufferSize (
     *outNumPacketsToRead = *outBufferSize / maxPacketSize;
 }
 
+// Time per callback
 static const float time_per_loop = .25f;
 
+// Prints an audio stream as a CSV, with each channel on a new line
 void printChannelsToCSV(WavFile &w){
     std::ofstream out;
     out.open("/Users/john/Documents/Xcode Projects/WavFileOpener/test.csv", std::ios::out | std::ios::trunc);
@@ -151,15 +159,23 @@ void printChannelsToCSV(WavFile &w){
 
 int main(int argc, const char * argv[]) {
     WavFile wav ("/Users/john/Documents/Xcode Projects/WavFileOpener/test.wav");
-    std::cout << wav.toString();
-    // printChannelsToCSV(wav);
+    std::cout << wav.toString(); // Print the properties of the loaded wave file
+    // printChannelsToCSV(wav); // Print channels to CSV for debugging in external applications
+    
+    // Normalizes the audio stream so that the max sample is at 1
+    // Helpful for samples or recordings that are quiet
     // wav.normalizeSamples();
+    
+    // The rest of the main function is code to start an audio queue
+    // to playback the loaded wav file
+    
     
     Player p = {&wav, 0, wav.getNumSamples(), 0, {0}};
     
     AudioQueueRef queue;
     OSStatus status;
     
+    // Set up the Audio Stream Basic Description using the WavFile
     p.fmt.mSampleRate = wav.getSampleRate();
     p.fmt.mFormatID = kAudioFormatLinearPCM;
     p.fmt.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
@@ -168,19 +184,23 @@ int main(int argc, const char * argv[]) {
     p.fmt.mBytesPerPacket = p.fmt.mBytesPerFrame = sizeof(float)*wav.getNumChannels();
     p.fmt.mBitsPerChannel = sizeof(float)*8;
     
+    // Create the audio queue, with the callback defined above
     status = AudioQueueNewOutput(&(p.fmt), AQcallback, &p, CFRunLoopGetCurrent(),
                                  kCFRunLoopCommonModes, 0, &queue);
     
     std::cout << "New Output Status: " << getError(status) << std::endl;
     
+    // Number of buffers for audio queue, and the size of each buffer
     const int num_bufs = 4;
     uint32_t buffer_size;
     AudioQueueBufferRef buf_refs[num_bufs];
     AudioQueueBuffer *bufs[num_bufs];
     
+    // Determine best size for buffers and packets to read for each callback
     DeriveBufferSize(p.fmt, p.fmt.mBytesPerPacket, time_per_loop, &buffer_size, &p.packets_per_read);
     std::cout << "Buffer Size = " << buffer_size << " bytes, reading " << p.packets_per_read << " packets per callback" << std::endl << std::endl;
     
+    // Create and initialize buffers
     for(int i = 0; i < num_bufs; ++i){
         AudioQueueAllocateBuffer(queue, buffer_size, &(buf_refs[i]));
         bufs[i] = buf_refs[i];
@@ -188,10 +208,13 @@ int main(int argc, const char * argv[]) {
         AQcallback(&p, queue, buf_refs[i]);
     }
     
+    // Set desired volume
     status = AudioQueueSetParameter (queue, kAudioQueueParam_Volume, 0.25f);
     
+    // Start playback
     status = AudioQueueStart (queue, NULL);
     
+    // Run the callback in a loop
     while (p.cur_sample <= p.num_samples){
         CFRunLoopRunInMode (
                             kCFRunLoopDefaultMode,
@@ -200,10 +223,12 @@ int main(int argc, const char * argv[]) {
                             );
     }
     
+    // Make sure that all audio is finished playing
     CFRunLoopRunInMode ( kCFRunLoopDefaultMode,
                         time_per_loop,
                         false);
     
+    // Dispose of the audio queue
     AudioQueueDispose(queue, true);
     
     return 0;

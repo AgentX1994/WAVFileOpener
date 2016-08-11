@@ -55,8 +55,11 @@ public:
         }
     }
     
+    // Pretty print the Wave File details
     std::string toString();
     
+    // Normalize samples
+    // Ensures the highest sample peaks at +-1
     void normalizeSamples();
     
 protected:
@@ -69,7 +72,7 @@ private:
     uint16_t block_align; // Alignment of blocks in the data stream
     uint16_t bits_per_sample; // Number of bits per sample;
     
-    uint32_t num_samples;
+    uint32_t num_samples; // The number of samples per channel in the file
     float **samples; // The sample arrays, an array of floats for each channel
 };
 
