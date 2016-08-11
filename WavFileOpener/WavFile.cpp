@@ -8,6 +8,8 @@
 
 #include "WavFile.hpp"
 #include <fstream>
+#include <sstream>
+#include <cmath>
 
 // Default Constructor
 WavFile::WavFile(){
@@ -56,11 +58,33 @@ enum class WavFormat {
     Extensible = 0xFFFE
 };
 
+// Normalizes the samples over the entire file
+// sample/max_sample for all samples
+void WavFile::normalizeSamples(){
+    float max_sample = 0;
+    
+    for(int channel = 0; channel < num_channels; ++channel){
+        for(int sample = 0; sample < num_samples; ++sample){
+            if(max_sample < std::abs(samples[channel][sample])){
+                max_sample = std::abs(samples[channel][sample]);
+            }
+        }
+    }
+    
+    std::cout << "Max Sample = " << max_sample << ", normalizing..." << std::endl << std::endl;
+    
+    for(int channel = 0; channel < num_channels; ++channel){
+        for(int sample = 0; sample < num_samples; ++sample){
+            samples[channel][sample] /= max_sample;
+        }
+    }
+}
+
 // Open a new wav file
 // Deallocates old file if necessary
 void WavFile::open(std::string filename){
     std::ifstream f;
-    f.open(filename, std::ios::binary | std::ios::ate);
+    f.open(filename, std::ios::binary);
     if(!f.is_open()){
         std::cerr << "Error: " << strerror(errno) << std::endl;
         throw std::runtime_error("WavFile Error: Could not open file\n");
@@ -69,54 +93,58 @@ void WavFile::open(std::string filename){
     while(!f.eof()){
         uint32_t chunkid;
         f.read(reinterpret_cast<char*>(&chunkid), sizeof(chunkid));
+        chunkid = __builtin_bswap32(chunkid);
         switch((WavChunks)chunkid){
                 
             case WavChunks::RiffHeader:
                 uint32_t filesize;
-                f.read(reinterpret_cast<char*>(filesize), sizeof(filesize));
+                f.read(reinterpret_cast<char*>(&filesize), sizeof(filesize));
                 uint32_t format_specifier;
-                f >> format_specifier;
-                if (format_specifier != 0x57415645) {
+                f.read(reinterpret_cast<char*>(&format_specifier), sizeof(filesize));
+                if (__builtin_bswap32(format_specifier) != 0x57415645) {
                     throw std::runtime_error("WavFile Error: Not a Wave File!");
                 }
                 break;
                 
             case WavChunks::Format:
                 uint32_t chunksize;
-                f >> chunksize;
-                f >> format;
+                f.read(reinterpret_cast<char*>(&chunksize), sizeof(chunksize));;
+                
+                f.read(reinterpret_cast<char*>(&format), sizeof(format));
                 
                 if ((WavFormat)format != WavFormat::PulseCodeModulation){
                     throw std::runtime_error("WavFile Error: only PCM wave files are supported!");
                 }
                 
-                f >> num_channels;
-                f >> sample_rate;
-                f >> byte_rate;
-                f >> block_align;
-                f >> bits_per_sample;
+                f.read(reinterpret_cast<char*>(&num_channels), sizeof(num_channels));
+                f.read(reinterpret_cast<char*>(&sample_rate), sizeof(sample_rate));
+                f.read(reinterpret_cast<char*>(&byte_rate), sizeof(byte_rate));
+                f.read(reinterpret_cast<char*>(&block_align), sizeof(block_align));
+                f.read(reinterpret_cast<char*>(&bits_per_sample), sizeof(bits_per_sample));
                 
                 break;
                 
             case WavChunks::Data:
                 uint32_t datasize;
-                f >> datasize;
-                samples = new uint16_t*[num_channels];
+                f.read(reinterpret_cast<char*>(&datasize), sizeof(datasize));
+                samples = new float*[num_channels];
                 num_samples =datasize*8/num_channels/bits_per_sample; // calculate number of samples
                 
                 uint8_t temp8bit;
                 int16_t temp16bit;
                 
-                for (int channel = 0; channel < num_channels; ++channel){
-                    samples[channel] = new uint16_t[num_samples];
-                    
-                    for (int sample = 0; sample < num_samples; ++sample){
+                for (int channel = 0; channel < num_channels; ++channel) {
+                    samples[channel] = new float[num_samples];
+                }
+                
+                for (int sample = 0; sample < num_samples; ++sample) {
+                    for(int channel = 0; channel < num_channels; ++channel){
                         if (bits_per_sample == 8) {
-                            f >> temp8bit;
-                            samples[channel][sample] = (uint16_t)temp8bit;
+                            f.read(reinterpret_cast<char*>(&temp8bit), sizeof(temp8bit));
+                            samples[channel][sample] = (float)temp8bit;
                         } else if (bits_per_sample == 16) {
-                            f >> temp16bit;
-                            samples[channel][sample] = temp16bit;
+                            f.read(reinterpret_cast<char*>(&temp16bit), sizeof(temp16bit));
+                            samples[channel][sample] = (float)temp16bit;
                         }
                     }
                 }
@@ -124,10 +152,12 @@ void WavFile::open(std::string filename){
                 
             default:
                 uint32_t skipsize;
-                f >> skipsize;
+                f.read(reinterpret_cast<char*>(&skipsize), sizeof(skipsize));
                 f.ignore(static_cast<int>(skipsize));
         }
     }
+    
+    normalizeSamples();
 }
 
 // Getters
@@ -159,6 +189,56 @@ uint32_t WavFile::getNumSamples(){
     return num_samples;
 }
 
-uint16_t ** WavFile::getData(){
+float ** WavFile::getData(){
     return samples;
+}
+
+std::string audioFormatToString(WavFormat n){
+    switch (n) {
+        case WavFormat::PulseCodeModulation:
+            return std::string("Linear PCM");
+            break;
+        case WavFormat::IEEEFloatingPoint:
+            return std::string("IEEEFloating Point");
+            break;
+        case WavFormat::ALaw:
+            return std::string("ALaw");
+            break;
+        case WavFormat::MuLaw:
+            return std::string("MuLaw");
+            break;
+        case WavFormat::IMAADPCM:
+            return std::string("IMAAD PCM");
+            break;
+        case WavFormat::YamahaITUG723ADPCM:
+            return std::string("Yamaha ITUG723AD PCM");
+            break;
+        case WavFormat::GSM610:
+            return std::string("GSM 610");
+            break;
+        case WavFormat::ITUG721ADPCM:
+            return std::string("ITUG721AD PCM");
+            break;
+        case WavFormat::MPEG:
+            return std::string("MPEG");
+            break;
+        case WavFormat::Extensible:
+            return std::string("Extensible");
+        default:
+            return std::string("Unknown");
+            break;
+    }
+}
+
+std::string WavFile::toString(){
+    std::stringstream s;
+    s << "-Wave File-" << std::endl;
+    s << "\tSample Rate = " << sample_rate << " Hz" << std::endl;
+    s << "\tAudio Format = " << audioFormatToString((WavFormat)format) << std::endl;
+    s << "\tNumber of Channels = " << num_channels << std::endl;
+    s << "\tByte Rate = " << byte_rate << std::endl;
+    s << "\tBlock Align = " << block_align << std::endl;
+    s << "\tBits per Sample = " << bits_per_sample << std::endl;
+    s << "\tNumber of Samples = " << num_samples << std::endl << std::endl;
+    return s.str();
 }

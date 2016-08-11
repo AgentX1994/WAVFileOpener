@@ -44,16 +44,18 @@ public:
     uint16_t getBlockAlign();
     uint16_t getBitsPerSample();
     uint32_t getNumSamples();
-    uint16_t ** getData();
+    float ** getData();
     
     // Operator to access individual channels
-    uint16_t *operator[](int index){
+    float *operator[](int index){
         if(index < 0 || index >= num_channels){
             throw std::out_of_range("Tried to access a channel that doesn't exist!");
         } else {
             return samples[index];
         }
     }
+    
+    std::string toString();
     
 protected:
 private:
@@ -65,7 +67,9 @@ private:
     uint16_t bits_per_sample; // Number of bits per sample;
     
     uint32_t num_samples;
-    uint16_t **samples; // The sample arrays, an array of floats for each channel
+    float **samples; // The sample arrays, an array of floats for each channel
+    
+    void normalizeSamples();
 };
 
 #endif /* WavFile_hpp */

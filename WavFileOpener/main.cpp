@@ -7,6 +7,7 @@
 //
 
 #include <iostream>
+#include <fstream>
 #include <AudioToolbox/AudioToolbox.h>
 
 #include "WavFile.hpp"
@@ -15,6 +16,7 @@ typedef struct {
     WavFile *w;
     uint32_t cur_sample;
     uint32_t num_samples;
+    uint32_t packets_per_read;
     AudioStreamBasicDescription fmt;
 } Player;
 
@@ -23,29 +25,26 @@ void AQcallback (void *ptr, AudioQueueRef queue, AudioQueueBufferRef buf_ref){
     OSStatus status;
     AudioQueueBuffer *buf = buf_ref;
     uint32_t nsamples = buf->mAudioDataByteSize / p->fmt.mBytesPerPacket;
-    uint16_t *samp = (uint16_t *)buf->mAudioData;
-    
-    printf("Callback! nsampl: %d\n", nsamples);
+    float *samp = (float *)buf->mAudioData;
+        
+    if(p->cur_sample > p->num_samples){
+        AudioQueueStop(queue, false);
+        return;
+    }
     
     int sample = 0;
     while(sample < nsamples){
         for (int channel = 0; channel < p->w->getNumChannels(); ++channel) {
             if (p->cur_sample > p->num_samples) {
                 samp[sample] = 0;
+            } else {
+                samp[sample] = p->w->getData()[channel][p->cur_sample];
             }
-            samp[sample] = p->w->getData()[channel][p->cur_sample];
             ++sample;
         }
         ++(p->cur_sample);
     }
     status = AudioQueueEnqueueBuffer (queue, buf_ref, 0, NULL);
-    printf ("Enqueue status: %d\n", status);
-}
-
-static const int MAXPATHLEN = 65535;
-std::string pwd(){
-    char temp[MAXPATHLEN];
-    return ( getcwd(temp, MAXPATHLEN)) ? std::string(temp) : std::string("");
 }
 
 std::string getError(OSStatus status){
@@ -96,64 +95,112 @@ std::string getError(OSStatus status){
 
 }
 
+void DeriveBufferSize (
+                       AudioStreamBasicDescription &ASBDesc,
+                       UInt32                      maxPacketSize,
+                       Float64                     seconds,
+                       UInt32                      *outBufferSize,
+                       UInt32                      *outNumPacketsToRead
+) {
+    static const int maxBufferSize = 0x50000;
+    static const int minBufferSize = 0x4000;
+    
+    if (ASBDesc.mFramesPerPacket != 0) {
+        Float64 numPacketsForTime =
+        ASBDesc.mSampleRate / ASBDesc.mFramesPerPacket * seconds;
+        *outBufferSize = numPacketsForTime * maxPacketSize;
+    } else {
+        *outBufferSize =
+        maxBufferSize > maxPacketSize ?
+        maxBufferSize : maxPacketSize;
+    }
+    
+    if (
+        *outBufferSize > maxBufferSize &&
+        *outBufferSize > maxPacketSize
+        )
+        *outBufferSize = maxBufferSize;
+    else {
+        if (*outBufferSize < minBufferSize)
+            *outBufferSize = minBufferSize;
+    }
+    
+    *outNumPacketsToRead = *outBufferSize / maxPacketSize;
+}
+
+static const float time_per_loop = 10;
+
+void printChannelsToCSV(WavFile w){
+    std::ofstream out;
+    out.open("/Users/john/Documents/Xcode Projects/WavFileOpener/test.csv", std::ios::out | std::ios::trunc);
+    if(!out.is_open()){
+        throw std::runtime_error("COULD NOT OPEN FILE!");
+    }
+    for(int channel = 0; channel < w.getNumChannels(); ++channel){
+        for(int sample = 0; sample < w.getNumSamples(); ++sample){
+            out << w[channel][sample];
+            if (sample == w.getNumSamples() - 1) {
+                out << std::endl;
+            } else {
+                out << ", ";
+            }
+        }
+    }
+    out.close();
+}
+
 int main(int argc, const char * argv[]) {
-    std::cout << "Current directory is: " << pwd() << "\n";
-    WavFile wav = WavFile("/Users/john/Documents/Xcode Projects/WavFileOpener/test.wav");
-    Player p = {&wav, 0, wav.getNumSamples(), {0}};
+    WavFile wav ("/Users/john/Documents/Xcode Projects/WavFileOpener/test.wav");
+    std::cout << wav.toString();
+    printChannelsToCSV(wav);
+    
+    Player p = {&wav, 0, wav.getNumSamples(), 0, {0}};
     
     AudioQueueRef queue;
     OSStatus status;
-    AudioQueueBufferRef buf_ref1, buf_ref2;
     
     p.fmt.mSampleRate = wav.getSampleRate();
     p.fmt.mFormatID = kAudioFormatLinearPCM;
-    p.fmt.mFormatFlags = kAudioFormatFlagIsSignedInteger | kAudioFormatFlagIsPacked;
+    p.fmt.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;
     p.fmt.mFramesPerPacket = 1;
     p.fmt.mChannelsPerFrame = wav.getNumChannels();
-    p.fmt.mBytesPerPacket = p.fmt.mBytesPerFrame = sizeof(uint16_t)*wav.getNumChannels();
-    p.fmt.mBitsPerChannel = sizeof(uint16_t)*8;
+    p.fmt.mBytesPerPacket = p.fmt.mBytesPerFrame = sizeof(float)*wav.getNumChannels();
+    p.fmt.mBitsPerChannel = sizeof(float)*8;
     
     status = AudioQueueNewOutput(&(p.fmt), AQcallback, &p, CFRunLoopGetCurrent(),
                                  kCFRunLoopCommonModes, 0, &queue);
     
     std::cout << "New Output Status: " << getError(status) << std::endl;
     
-    if (status == kAudioFormatUnsupportedDataFormatError) puts ("oops!");
-    else printf("NewOutput status: %d\n", status);
+    const int num_bufs = 3;
+    uint32_t buffer_size;
+    AudioQueueBufferRef buf_refs[num_bufs];
+    AudioQueueBuffer *bufs[num_bufs];
     
-    status = AudioQueueAllocateBuffer(queue, 20000, &buf_ref1);
-    printf("Allocate Status: %d\n", status);
+    DeriveBufferSize(p.fmt, p.fmt.mBytesPerPacket, time_per_loop, &buffer_size, &p.packets_per_read);
+    std::cout << "Buffer Size = " << buffer_size << " bytes, reading " << p.packets_per_read << " packets per callback" << std::endl << std::endl;
     
-    AudioQueueBuffer *buf = buf_ref1;
-    printf ("buf: %p, data: %p, len: %d\n", buf, buf->mAudioData, buf->mAudioDataByteSize);
-    buf->mAudioDataByteSize = 20000;
+    for(int i = 0; i < num_bufs; ++i){
+        AudioQueueAllocateBuffer(queue, buffer_size, &(buf_refs[i]));
+        bufs[i] = buf_refs[i];
+        bufs[i]->mAudioDataByteSize = buffer_size;
+        AQcallback(&p, queue, buf_refs[i]);
+    }
     
-    AQcallback(&p, queue, buf_ref1);
-    
-    status = AudioQueueAllocateBuffer (queue, 20000, &buf_ref2);
-    printf ("Allocate2 status: %d\n", status);
-    
-    buf = buf_ref2;
-    buf->mAudioDataByteSize = 20000;
-    
-    AQcallback(&p, queue, buf_ref2);
-    
-    status = AudioQueueSetParameter (queue, kAudioQueueParam_Volume, 1.0);
-    printf ("Volume status: %d\n", status);
+    status = AudioQueueSetParameter (queue, kAudioQueueParam_Volume, 0.25f);
     
     status = AudioQueueStart (queue, NULL);
-    printf ("Start status: %d\n", status);
     
     while (p.cur_sample <= p.num_samples){
         CFRunLoopRunInMode (
                             kCFRunLoopDefaultMode,
-                            0.25, // seconds
+                            time_per_loop, // seconds
                             false // don't return after source handled
                             );
     }
     
     CFRunLoopRunInMode ( kCFRunLoopDefaultMode,
-                        1,
+                        time_per_loop,
                         false);
     
     AudioQueueDispose(queue, true);
