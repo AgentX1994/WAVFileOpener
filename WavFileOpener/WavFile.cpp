@@ -116,7 +116,7 @@ inline int32_t int24to32(unsigned char *in){
 }
 
 // Normalizing factors for conversions
-const float uint8normalize = 1.0f/0xff;
+const float uint8normalize = 2.0f/0xff; // Maps to [0,2], subtract 1 afterwards
 const float int16normalize = 1.0f/0x7fff;
 const float int24normalize = 1.0f / 8388607.0; // Magic number, maps smallest to -1 and largest to 1
 
@@ -189,7 +189,7 @@ void WavFile::open(std::string filename){
                         if (bits_per_sample == 8) {
                             uint8_t temp8bit;
                             f.read(reinterpret_cast<char*>(&temp8bit), sizeof(temp8bit));
-                            samples[channel][sample] = uint8normalize*(float)temp8bit;
+                            samples[channel][sample] = uint8normalize*(float)temp8bit - 1;
                         } else if (bits_per_sample == 16) {
                             int16_t temp16bit;
                             f.read(reinterpret_cast<char*>(&temp16bit), sizeof(temp16bit));
@@ -298,6 +298,7 @@ std::string WavFile::toString(){
     s << "\tByte Rate = " << byte_rate << std::endl;
     s << "\tBlock Align = " << block_align << std::endl;
     s << "\tBits per Sample = " << bits_per_sample << std::endl;
-    s << "\tNumber of Samples = " << num_samples << std::endl << std::endl;
+    s << "\tNumber of Samples = " << num_samples << std::endl;
+    s << "\tRuntime = " << (float)num_samples/(float)sample_rate << " seconds" << std::endl << std::endl;
     return s.str();
 }
