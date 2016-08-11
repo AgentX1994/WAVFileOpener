@@ -157,10 +157,15 @@ void WavFile::open(std::string filename){
     }
     
     // While not at end of file
-    while(!f.eof()){
+    while(true){
         uint32_t chunkid;
         // The best way I have currently found to extract data fields
         f.read(reinterpret_cast<char*>(&chunkid), sizeof(chunkid));
+        
+        // Read will return garbage when reading past the end of file
+        // If End Of File flag set, break;
+        if(f.eof())
+            break;
         
         // Chunk ID's are stored in big endian format, swap the bytes around
         chunkid = __builtin_bswap32(chunkid);
