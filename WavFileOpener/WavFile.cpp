@@ -111,7 +111,7 @@ void WavFile::normalizeSamples(){
 
 // Turns a 3 byte char array into a 32 bit int
 // The ternary operator decides if sign extension is necessary
-inline int32_t int24to32(char *in){
+inline int32_t int24to32(unsigned char *in){
     return ((in[2] & 0x80) ? (0xff <<24) : 0) | (in[2] << 16) | (in[1] << 8) | in[0];
 }
 
@@ -195,8 +195,8 @@ void WavFile::open(std::string filename){
                             f.read(reinterpret_cast<char*>(&temp16bit), sizeof(temp16bit));
                             samples[channel][sample] = int16normalize*(float)temp16bit;
                         } else if (bits_per_sample == 24) {
-                            char temp24bit[3] = {0,0,0};
-                            f.read(temp24bit, 3); // Uh Oh, magic numbers! 24 bits = 3 bytes
+                            unsigned char temp24bit[3] = {0,0,0};
+                            f.read((char*)temp24bit, 3); // Uh Oh, magic numbers! 24 bits = 3 bytes
                             int32_t temp = int24to32(temp24bit);
                             samples[channel][sample] = int24normalize*(float)temp;
                         }
