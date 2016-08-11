@@ -10,6 +10,7 @@
 #include <fstream>
 #include <sstream>
 #include <cmath>
+#include <iomanip>
 
 // Default Constructor
 WavFile::WavFile(){
@@ -58,6 +59,34 @@ enum class WavFormat {
     Extensible = 0xFFFE
 };
 
+
+const unsigned char KSDATAFORMAT_SUBTYPE_PCM[] = {
+    0x01,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x00,
+    0x10,
+    0x00,
+    0x80,
+    0x00,
+    0x00,
+    0xaa,
+    0x00,
+    0x38,
+    0x9b,
+    0x71};
+
+bool compareSubtype(const unsigned char a[16], const unsigned char b[16]){
+    for(int i = 0; i < 16; ++i){
+        if(a[i] != b[i])
+            return false;
+    }
+    return true;
+}
+
+
 // Normalizes the samples over the entire file
 // sample/max_sample for all samples
 void WavFile::normalizeSamples(){
@@ -71,7 +100,7 @@ void WavFile::normalizeSamples(){
         }
     }
     
-    std::cout << "Max Sample = " << max_sample << ", normalizing..." << std::endl << std::endl;
+    std::cout << "Max Sample = " << std::setprecision(10) << max_sample << ", normalizing..." << std::endl << std::endl;
     
     for(int channel = 0; channel < num_channels; ++channel){
         for(int sample = 0; sample < num_samples; ++sample){
@@ -79,6 +108,17 @@ void WavFile::normalizeSamples(){
         }
     }
 }
+
+// Turns a 3 byte char array into a 32 bit int
+// The ternary operator decides if sign extension is necessary
+inline int32_t int24to32(char *in){
+    return ((in[2] & 0x80) ? (0xff <<24) : 0) | (in[2] << 16) | (in[1] << 8) | in[0];
+}
+
+// Normalizing factors for conversions
+const float uint8normalize = 1.0f/0xff;
+const float int16normalize = 1.0f/0x7fff;
+const float int24normalize = 1.0f / 8388607.0; // Magic number, maps smallest to -1 and largest to 1
 
 // Open a new wav file
 // Deallocates old file if necessary
@@ -97,7 +137,6 @@ void WavFile::open(std::string filename){
         switch((WavChunks)chunkid){
                 
             case WavChunks::RiffHeader:
-                uint32_t filesize;
                 f.read(reinterpret_cast<char*>(&filesize), sizeof(filesize));
                 uint32_t format_specifier;
                 f.read(reinterpret_cast<char*>(&format_specifier), sizeof(filesize));
@@ -112,15 +151,26 @@ void WavFile::open(std::string filename){
                 
                 f.read(reinterpret_cast<char*>(&format), sizeof(format));
                 
-                if ((WavFormat)format != WavFormat::PulseCodeModulation){
-                    throw std::runtime_error("WavFile Error: only PCM wave files are supported!");
-                }
-                
                 f.read(reinterpret_cast<char*>(&num_channels), sizeof(num_channels));
                 f.read(reinterpret_cast<char*>(&sample_rate), sizeof(sample_rate));
                 f.read(reinterpret_cast<char*>(&byte_rate), sizeof(byte_rate));
                 f.read(reinterpret_cast<char*>(&block_align), sizeof(block_align));
                 f.read(reinterpret_cast<char*>(&bits_per_sample), sizeof(bits_per_sample));
+                
+                if ((WavFormat)format != WavFormat::PulseCodeModulation){
+                    uint16_t extra_params_size;
+                    f.read(reinterpret_cast<char*>(&extra_params_size), sizeof(extra_params_size));
+                    uint16_t valid_bits_per_sample;
+                    f.read(reinterpret_cast<char*>(&valid_bits_per_sample), sizeof(valid_bits_per_sample));
+                    uint32_t channel_mask;
+                    f.read(reinterpret_cast<char*>(&channel_mask), sizeof(channel_mask));
+                    unsigned char subformat[16];
+                    f.read((char*)subformat, 16);
+                    
+                    if(compareSubtype(subformat, KSDATAFORMAT_SUBTYPE_PCM)){
+                        std::cout << "Subformat is KSDATAFORMAT_SUBTYPE_PCM" << std::endl;
+                    }
+                }
                 
                 break;
                 
@@ -130,9 +180,6 @@ void WavFile::open(std::string filename){
                 samples = new float*[num_channels];
                 num_samples =datasize*8/num_channels/bits_per_sample; // calculate number of samples
                 
-                uint8_t temp8bit;
-                int16_t temp16bit;
-                
                 for (int channel = 0; channel < num_channels; ++channel) {
                     samples[channel] = new float[num_samples];
                 }
@@ -140,24 +187,36 @@ void WavFile::open(std::string filename){
                 for (int sample = 0; sample < num_samples; ++sample) {
                     for(int channel = 0; channel < num_channels; ++channel){
                         if (bits_per_sample == 8) {
+                            uint8_t temp8bit;
                             f.read(reinterpret_cast<char*>(&temp8bit), sizeof(temp8bit));
-                            samples[channel][sample] = (float)temp8bit;
+                            samples[channel][sample] = uint8normalize*(float)temp8bit;
                         } else if (bits_per_sample == 16) {
+                            int16_t temp16bit;
                             f.read(reinterpret_cast<char*>(&temp16bit), sizeof(temp16bit));
-                            samples[channel][sample] = (float)temp16bit;
+                            samples[channel][sample] = int16normalize*(float)temp16bit;
+                        } else if (bits_per_sample == 24) {
+                            char temp24bit[3] = {0,0,0};
+                            f.read(temp24bit, 3); // Uh Oh, magic numbers! 24 bits = 3 bytes
+                            int32_t temp = int24to32(temp24bit);
+                            samples[channel][sample] = int24normalize*(float)temp;
                         }
                     }
                 }
                 break;
                 
             default:
+                unsigned char tag[4];
+                tag[0] = (chunkid >> 24) & 0xff;
+                tag[1] = (chunkid >> 16) & 0xff;
+                tag[2] = (chunkid >> 8) & 0xff;
+                tag[3] = chunkid & 0xff;
+                std::cout << "Encountered unknown chunk, ID: " << tag << " or " << std::hex << chunkid;
+                std::cout << std::dec << " at byte " << f.tellg() << std::endl << std::endl;
                 uint32_t skipsize;
                 f.read(reinterpret_cast<char*>(&skipsize), sizeof(skipsize));
                 f.ignore(static_cast<int>(skipsize));
         }
     }
-    
-    normalizeSamples();
 }
 
 // Getters

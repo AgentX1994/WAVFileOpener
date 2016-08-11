@@ -152,7 +152,8 @@ void printChannelsToCSV(WavFile &w){
 int main(int argc, const char * argv[]) {
     WavFile wav ("/Users/john/Documents/Xcode Projects/WavFileOpener/test.wav");
     std::cout << wav.toString();
-    printChannelsToCSV(wav);
+    // printChannelsToCSV(wav);
+    // wav.normalizeSamples();
     
     Player p = {&wav, 0, wav.getNumSamples(), 0, {0}};
     

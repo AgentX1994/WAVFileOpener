@@ -57,8 +57,11 @@ public:
     
     std::string toString();
     
+    void normalizeSamples();
+    
 protected:
 private:
+    uint32_t filesize; // File size
     uint16_t format; // Currently only supports 1 (PCM)
     uint16_t num_channels; // Number of audio channels;
     uint32_t sample_rate; // Sample rate of the audio;
@@ -68,8 +71,6 @@ private:
     
     uint32_t num_samples;
     float **samples; // The sample arrays, an array of floats for each channel
-    
-    void normalizeSamples();
 };
 
 #endif /* WavFile_hpp */
