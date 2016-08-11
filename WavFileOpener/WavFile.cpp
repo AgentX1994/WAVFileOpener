@@ -12,8 +12,8 @@
 #include <cmath>
 #include <iomanip>
 
-// Default Constructor
-WavFile::WavFile(){
+// Sets/Resets all fields to zero
+void WavFile::init(){
     samples = NULL;
     format = 0;
     num_channels = 0;
@@ -21,6 +21,12 @@ WavFile::WavFile(){
     byte_rate = 0;
     block_align = 0;
     bits_per_sample = 0;
+    num_samples = 0;
+}
+
+// Default Constructor
+WavFile::WavFile(){
+    init();
 }
 
 // Constructor
@@ -29,15 +35,22 @@ WavFile::WavFile(std::string filename){
     open(filename);
 }
 
-// Destructor
-// Automatically deallocates any allocated memory
-WavFile::~WavFile(){
+// Frees samples if needed
+// Outside of destructor so that open function can call it
+void WavFile::freeSamples(){
     if(samples){
         for (int i = 0; i < num_channels; ++i) {
             delete [] samples[i];
         }
         delete [] samples;
     }
+}
+
+
+// Destructor
+// Automatically deallocates any allocated memory
+WavFile::~WavFile(){
+    freeSamples();
 }
 
 // Known chunk id's of RIFF chunks
@@ -129,6 +142,11 @@ const float int24normalize = 1.0f / 8388607.0; // Magic number, maps smallest to
 // Open a new wav file
 // Deallocates old file if necessary
 void WavFile::open(std::string filename){
+    
+    // If a file is already loaded, free it
+    freeSamples();
+    init();
+    
     
     // Open the file
     std::ifstream f;

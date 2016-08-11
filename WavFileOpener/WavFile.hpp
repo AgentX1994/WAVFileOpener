@@ -64,6 +64,9 @@ public:
     
 protected:
 private:
+    void init(); // Sets/Resets all fields to zero
+    void freeSamples(); // Frees the samples array
+    
     uint32_t filesize; // File size
     uint16_t format; // Currently only supports 1 (PCM)
     uint16_t num_channels; // Number of audio channels;
