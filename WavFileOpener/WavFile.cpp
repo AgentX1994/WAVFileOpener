@@ -383,7 +383,7 @@ std::string audioFormatToString(WavFormat n){
 // Pretty print runtime
 std::string WavFile::printRuntime(){
     float runtime = (float)num_samples/(float)sample_rate;
-    int seconds = (int)floorf(runtime);
+    int seconds = (int)roundf(runtime);
     int minutes = seconds/60;
     seconds = seconds%60;
     std::stringstream s;
