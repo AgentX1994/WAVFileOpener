@@ -26,7 +26,7 @@ public:
     
     // Constructor
     // Loads specified wav file into memory
-    WavFile(std::string filename);
+    WavFile(std::string path);
     
     // Destructor
     // Automatically deallocates any allocated memory
@@ -34,9 +34,10 @@ public:
     
     // Open a new wav file
     // Deallocates old file if necessary
-    void open(std::string filename);
+    void open(std::string path);
     
     // Getters
+    std::string getFileName();
     uint16_t getFormat();
     uint16_t getNumChannels();
     uint32_t getSampleRate();
@@ -57,6 +58,7 @@ public:
     
     // Pretty print the Wave File details
     std::string toString();
+    std::string printRuntime();
     
     // Normalize samples
     // Ensures the highest sample peaks at +-1
@@ -67,6 +69,7 @@ private:
     void init(); // Sets/Resets all fields to zero
     void freeSamples(); // Frees the samples array
     
+    std::string filename;
     uint32_t filesize; // File size
     uint16_t format; // Currently only supports 1 (PCM)
     uint16_t num_channels; // Number of audio channels;

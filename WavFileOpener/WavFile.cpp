@@ -31,8 +31,8 @@ WavFile::WavFile(){
 
 // Constructor
 // Loads specified wav file into memory
-WavFile::WavFile(std::string filename){
-    open(filename);
+WavFile::WavFile(std::string path){
+    open(path);
 }
 
 // Frees samples if needed
@@ -141,16 +141,29 @@ const float int24normalize = 1.0f / 8388607.0; // Magic number, maps smallest to
 
 // Open a new wav file
 // Deallocates old file if necessary
-void WavFile::open(std::string filename){
+void WavFile::open(std::string path){
     
     // If a file is already loaded, free it
     freeSamples();
     init();
     
+    char sep = '/';
+    
+#ifdef _WIN32
+    sep = '\\'
+#endif
+    
+    unsigned long i = path.rfind(sep);
+    
+    if (i != std::string::npos){
+        filename = path.substr(i+1, path.length()-1);
+    } else {
+        filename = path;
+    }
     
     // Open the file
     std::ifstream f;
-    f.open(filename, std::ios::binary);
+    f.open(path, std::ios::binary);
     if(!f.is_open()){
         std::cerr << "Error: " << strerror(errno) << std::endl;
         throw std::runtime_error("WavFile Error: Could not open file\n");
@@ -367,10 +380,22 @@ std::string audioFormatToString(WavFormat n){
     }
 }
 
+// Pretty print runtime
+std::string WavFile::printRuntime(){
+    float runtime = (float)num_samples/(float)sample_rate;
+    int seconds = (int)floorf(runtime);
+    int minutes = seconds/60;
+    seconds = seconds%60;
+    std::stringstream s;
+    s << minutes << "m " << seconds << "s";
+    return s.str();
+}
+
 // Pretty print the Wave File details
 std::string WavFile::toString(){
     std::stringstream s;
     s << "-Wave File-" << std::endl;
+    s << "\tFileName: " << filename << std::endl;
     s << "\tSample Rate = " << sample_rate << " Hz" << std::endl;
     s << "\tAudio Format = " << audioFormatToString((WavFormat)format) << std::endl;
     s << "\tNumber of Channels = " << num_channels << std::endl;
@@ -378,6 +403,6 @@ std::string WavFile::toString(){
     s << "\tBlock Align = " << block_align << std::endl;
     s << "\tBits per Sample = " << bits_per_sample << std::endl;
     s << "\tNumber of Samples = " << num_samples << std::endl;
-    s << "\tRuntime = " << (float)num_samples/(float)sample_rate << " seconds" << std::endl << std::endl;
+    s << "\tRuntime = " << printRuntime() << std::endl << std::endl;
     return s.str();
 }

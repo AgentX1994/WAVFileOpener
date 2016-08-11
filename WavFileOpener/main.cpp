@@ -209,7 +209,7 @@ int main(int argc, const char * argv[]) {
     }
     
     // Set desired volume
-    status = AudioQueueSetParameter (queue, kAudioQueueParam_Volume, 0.25f);
+    status = AudioQueueSetParameter (queue, kAudioQueueParam_Volume, 1.0f);
     
     // Start playback
     status = AudioQueueStart (queue, NULL);
