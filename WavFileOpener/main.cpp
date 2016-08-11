@@ -33,7 +33,7 @@ void AQcallback (void *ptr, AudioQueueRef queue, AudioQueueBufferRef buf_ref){
     }
     
     int sample = 0;
-    while(sample < nsamples){
+    while(sample < nsamples * p->w->getNumChannels()){
         for (int channel = 0; channel < p->w->getNumChannels(); ++channel) {
             if (p->cur_sample > p->num_samples) {
                 samp[sample] = 0;
@@ -128,9 +128,9 @@ void DeriveBufferSize (
     *outNumPacketsToRead = *outBufferSize / maxPacketSize;
 }
 
-static const float time_per_loop = 10;
+static const float time_per_loop = .25f;
 
-void printChannelsToCSV(WavFile w){
+void printChannelsToCSV(WavFile &w){
     std::ofstream out;
     out.open("/Users/john/Documents/Xcode Projects/WavFileOpener/test.csv", std::ios::out | std::ios::trunc);
     if(!out.is_open()){
@@ -172,7 +172,7 @@ int main(int argc, const char * argv[]) {
     
     std::cout << "New Output Status: " << getError(status) << std::endl;
     
-    const int num_bufs = 3;
+    const int num_bufs = 4;
     uint32_t buffer_size;
     AudioQueueBufferRef buf_refs[num_bufs];
     AudioQueueBuffer *bufs[num_bufs];
