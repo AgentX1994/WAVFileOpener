@@ -17,3 +17,4 @@ Planned Features:
 * Reference counting with copy constructors and assignment operations
 * Maybe support for more formats
 
+Created by John Asper (AgentX1994)
